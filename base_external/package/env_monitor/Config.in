@@ -2,4 +2,4 @@
 config BR2_PACKAGE_ENV_MONITOR
 	bool "env_monitor"
 	help
-	  Includes the environment monitor application in kernel image
+	  Includes the environment monitor application in target root filesystem

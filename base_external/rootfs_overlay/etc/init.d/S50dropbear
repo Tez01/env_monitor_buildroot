@@ -1,0 +1,55 @@
+#!/bin/sh
+
+DROPBEAR_DIR=/var/run/dropbear
+PIDFILE=/var/run/dropbear.pid
+LOGFILE=/root/dropbear_debug.log
+
+case "$1" in
+    start)
+        echo "Starting Dropbear SSH server" > "$LOGFILE"
+        exec >>"$LOGFILE" 2>&1
+
+        mkdir -p /var/run
+        mkdir -p "$DROPBEAR_DIR"
+
+        echo "Generating Ed25519 host key"
+        dropbearkey \
+            -t ed25519 \
+            -f "$DROPBEAR_DIR/dropbear_ed25519_host_key"
+
+        echo "dropbearkey result: $?"
+
+        echo "Host-key files:"
+        ls -l "$DROPBEAR_DIR"
+
+        echo "Starting Dropbear"
+        /usr/sbin/dropbear \
+            -E \
+            -p 22 \
+            -P "$PIDFILE" \
+            -r "$DROPBEAR_DIR/dropbear_ed25519_host_key"
+
+        echo "Dropbear start result: $?"
+        ;;
+
+    stop)
+        echo "Stopping Dropbear SSH server"
+
+        if [ -f "$PIDFILE" ]; then
+            kill "$(cat "$PIDFILE")" 2>/dev/null
+            rm -f "$PIDFILE"
+        fi
+        ;;
+
+    restart)
+        "$0" stop
+        "$0" start
+        ;;
+
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0

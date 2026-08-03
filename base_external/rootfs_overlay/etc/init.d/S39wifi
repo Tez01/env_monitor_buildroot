@@ -1,0 +1,80 @@
+#!/bin/sh
+
+LOG=/root/wifi_debug.log
+
+echo "S39wifi started" > "$LOG"
+exec >>"$LOG" 2>&1
+
+echo
+echo "===== Wi-Fi startup ====="
+date
+uname -a
+
+echo "--- Existing interfaces ---"
+ls -l /sys/class/net
+ip link 2>&1
+
+echo "--- Loading brcmfmac ---"
+modprobe -v brcmfmac
+MODPROBE_RESULT=$?
+echo "modprobe result: $MODPROBE_RESULT"
+
+echo "--- Loaded modules ---"
+lsmod
+
+echo "--- Kernel messages after modprobe ---"
+dmesg | tail -n 150
+
+count=0
+while [ ! -d /sys/class/net/wlan0 ] && [ "$count" -lt 15 ]; do
+    echo "Waiting for wlan0: $count"
+    sleep 1
+    count=$((count + 1))
+done
+
+if [ ! -d /sys/class/net/wlan0 ]; then
+    echo "ERROR: wlan0 did not appear"
+    dmesg | tail -n 200
+    exit 1
+fi
+
+echo "--- wlan0 appeared ---"
+ip link show wlan0
+
+echo "--- Bringing wlan0 up ---"
+ip link set wlan0 up
+echo "ip link set result: $?"
+
+echo "--- Starting wpa_supplicant ---"
+wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf
+WPA_RESULT=$?
+echo "wpa_supplicant result: $WPA_RESULT"
+
+count=0
+while [ "$(cat /sys/class/net/wlan0/carrier 2>/dev/null)" != "1" ] \
+      && [ "$count" -lt 20 ]; do
+    echo "Waiting for Wi-Fi association: $count"
+    sleep 1
+    count=$((count + 1))
+done
+
+echo "--- Interface after wpa_supplicant ---"
+ip addr show wlan0
+echo -n "carrier: "
+cat /sys/class/net/wlan0/carrier 2>&1
+
+echo "--- Running DHCP directly ---"
+udhcpc -i wlan0 -n -q -t 5
+DHCP_RESULT=$?
+echo "udhcpc result: $DHCP_RESULT"
+
+echo "--- Final network state ---"
+ip addr
+ip route
+
+echo "--- Final kernel messages ---"
+dmesg | tail -n 200
+
+echo "===== Wi-Fi startup finished ====="
+
+exit 0
