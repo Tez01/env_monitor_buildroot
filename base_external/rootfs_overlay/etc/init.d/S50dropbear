@@ -24,6 +24,7 @@ case "$1" in
 
         echo "Starting Dropbear"
         /usr/sbin/dropbear \
+            -s \
             -E \
             -p 22 \
             -P "$PIDFILE" \
